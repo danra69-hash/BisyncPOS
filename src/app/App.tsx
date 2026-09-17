@@ -25,13 +25,16 @@ import {
   KioskMenuPage,
   KioskPayPage,
 } from '../features/kiosk/ui/KioskPages'
+import { InventoryCostingPage } from '../features/inventory/ui/InventoryCostingPage'
+import { InventoryProvider } from '../features/inventory/context/InventoryContext'
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell>
-        <Routes>
-          <Route path="/" element={<Navigate to="/order/floor" replace />} />
+      <InventoryProvider>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<Navigate to="/order/floor" replace />} />
 
           <Route path="/order" element={<Navigate to="/order/floor" replace />} />
           <Route path="/order/floor" element={<FloorPlanPage />} />
@@ -71,6 +74,7 @@ export default function App() {
 
           <Route path="/boh/kds" element={<KdsPage />} />
           <Route path="/boh/routing" element={<RoutingPage />} />
+          <Route path="/boh/costing" element={<InventoryCostingPage />} />
           <Route path="/boh/time-clock" element={<TimeClockPage />} />
           <Route path="/boh/reports" element={<ReportsPage />} />
           <Route path="/boh/permissions" element={<PermissionsPage />} />
@@ -80,6 +84,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/order/floor" replace />} />
         </Routes>
       </AppShell>
-    </BrowserRouter>
-  )
+    </InventoryProvider>
+  </BrowserRouter>
+)
 }

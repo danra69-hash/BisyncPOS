@@ -62,6 +62,7 @@ export const MODE_NAV: Record<PosMode, NavGroup[]> = {
     {
       title: 'Management',
       items: [
+        { to: '/boh/costing', label: 'Recipe Costing & COGS', badge: 'Live' },
         { to: '/boh/time-clock', label: 'Time Clock' },
         { to: '/boh/reports', label: 'Reports & Analytics' },
         { to: '/boh/permissions', label: 'User Permissions' },
@@ -108,6 +109,7 @@ export const NAV_ICONS: Record<string, NavIconKey> = {
   '/kiosk/pay': 'kioskPay',
   '/boh/kds': 'kds',
   '/boh/routing': 'routing',
+  '/boh/costing': 'modifiers',
   '/boh/time-clock': 'clock',
   '/boh/reports': 'reports',
   '/boh/permissions': 'permissions',
