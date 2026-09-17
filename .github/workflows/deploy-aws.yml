@@ -1,0 +1,90 @@
+name: Deploy Bisync POS to AWS
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy to AWS CloudFront + S3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Production SPA
+        run: npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'ap-southeast-1' }}
+
+      - name: Deploy CloudFormation Stack (Infrastructure)
+        id: cfn
+        run: |
+          STACK_NAME="bisync-pos-stack"
+          aws cloudformation deploy \
+            --template-file aws/cloudformation.yml \
+            --stack-name "$STACK_NAME" \
+            --parameter-overrides ProjectName=bisync-pos \
+            --no-fail-on-empty-changeset
+
+          BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" \
+            --output text)
+
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+
+          URL=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteURL'].OutputValue" \
+            --output text)
+
+          echo "bucket_name=$BUCKET_NAME" >> "$GITHUB_OUTPUT"
+          echo "dist_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+          echo "website_url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Sync Static Files to AWS S3
+        run: |
+          aws s3 sync dist/ s3://${{ steps.cfn.outputs.bucket_name }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html"
+
+          # Sync index.html with no-cache so clients always get the latest bundle references
+          aws s3 cp dist/index.html s3://${{ steps.cfn.outputs.bucket_name }}/index.html \
+            --cache-control "public, max-age=0, must-revalidate"
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.cfn.outputs.dist_id }} \
+            --paths "/*"
+
+      - name: Deployment Summary
+        run: |
+          echo "### 🚀 Deployed Successfully to AWS!" >> $GITHUB_STEP_SUMMARY
+          echo "URL: ${{ steps.cfn.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
